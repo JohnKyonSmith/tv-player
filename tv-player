@@ -1,0 +1,359 @@
+#!/bin/bash
+
+##
+##
+## Script to view/download/get info from vidoes on trollvids without needing flash.
+## Requires:
+## 	-mpv with networking support(ffmpeg with networking)
+## 	-wget
+## 	-everything else should come with a default linux install
+##
+##
+
+url_f="$2" 			# if a flag is used, get the second argument as the URL
+url_nf="$1" 			# no flags, get the first argument as the URL
+version="tv-player_v0.3.1" 	# I've rewritten the code several times already, still don't like it
+
+create_files(){			# Create all the files needed
+	touch \
+		/tmp/force_url.txt \
+		/tmp/google.txt \
+		/tmp/mainpage.txt \
+		/tmp/spider.txt \
+		/tmp/title.txt \
+		/tmp/xml_file.txt \
+		/tmp/xml_link.txt \
+		/tmp/video.m3u \
+		/tmp/tv01 \
+		/tmp/tv02 \
+		/tmp/tv03 \
+		/tmp/tv04
+}
+
+clean_files(){			# Clean the files when exiting script normally
+	ls /tmp | grep mainpage.txt > /dev/null
+	if [ $? == 0 ]
+	then
+		echo -n 'Cleaning files... '
+		rm \
+			/tmp/force_url.txt \
+			/tmp/google.txt \
+			/tmp/mainpage.txt \
+			/tmp/spider.txt \
+			/tmp/title.txt \
+			/tmp/xml_file.txt \
+			/tmp/xml_link.txt \
+			/tmp/video.m3u \
+			/tmp/tv01 \
+			/tmp/tv02 \
+			/tmp/tv03 \
+			/tmp/tv04
+		echo -e '\033[32mdone.\033[0m'
+	else
+		echo No files to clean.
+		exit 0
+	fi
+}
+
+get_main(){			# Download the video page
+	echo -n 'Downloading html page... '
+	if [[ "$url_nf" =~ "trollvids.com" ]]
+	then
+		wget -nv "$url_nf" -o /tmp/tv01 -O /tmp/mainpage.txt
+	elif [[ "$url_nf" != "trollvids.com" ]] 
+	then
+		wget -nv "$url_f" -o /tmp/tv01 -O /tmp/mainpage.txt
+	fi
+	echo -e '\033[32mdone.\033[0m'
+}
+
+force_xml(){			# Force an XML file link based on the URL and check to see if the source is from google/vimeo or has a valid XML file
+	if [[ "$url_nf" =~ "trollvids.com" ]] 
+	then
+		echo "$url_nf" >> /tmp/force_url.txt
+	else
+		echo "$url_f" >> /tmp/force_url.txt
+	fi
+	forced_config=`sed -n "s|.*\(http://trollvids.com/video/\)\([^/]*\).*|\2|p" < /tmp/force_url.txt`
+	grep -E '(docs.google.com|drive.google.com)' < /tmp/mainpage.txt > /dev/null	# If docs.google.com/drive.google.com are found, print a download link and exit
+	if [ $? == 0 ]
+	then
+		google_video=`sed -n 's|.*\(<iframe src="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt | sed -n 's|preview|view|p'`
+		echo "$google_video" > /tmp/google.txt
+		echo -e '\033[33mBOTNET video detected!\033[0m'
+		echo -e '\033[32mLinking to direct video:\033[0m'
+		echo -e "\033[32m$google_video\033[0m"
+		clean_files	# Comment out this line when debugging
+		exit 0
+	else										# If vimeo is found, output a link to xml_link.txt
+		grep -i 'player.vimeo.com' < /tmp/mainpage.txt > /dev/null
+		if [ $? == 0 ]
+		then
+			vimeo_video=`sed -n 's|.*\(player.vimeo.com\)\([^"]*\).*|\2|p' /tmp/mainpage.txt | sed -n 's|/video/|http://vimeo.com/|p'`
+			echo $vimeo_video >> /tmp/xml_file.txt
+		else
+			echo 'Forced XML config' > /tmp/tv02
+			echo "http://trollvids.com/nuevo/player/config.php?v=$forced_config" >> /tmp/xml_link.txt
+		fi
+	fi
+}
+
+google_downloader(){			# Almost identical to what force_xml does, but instead of pointing to the video page, it points to the download page.
+	grep -E '(docs.google.com|drive.google.com)' < /tmp/mainpage.txt > /dev/null
+	if [ $? == 0 ]
+	then
+		google_video_down=`sed -n 's|.*\(<iframe src="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt | sed -n 's|preview|view|p'`
+		echo "$google_video_down" > /tmp/google.txt
+		google_link=`sed -n 's|.*\(file/d/\)\([^/]*\)/.*|\2|p' <<< $google_video_down`
+		google_download="https://docs.google.com/uc?id=$google_link&export=download"
+		echo -e '\033[33mBOTNET video detected!\033[0m'
+		echo -e '\033[32mLinking to download:\033[0m'
+		echo -e "\033[32m$google_download\033[0m"
+		clean_files #Comment out this line when debugging
+		exit 0
+	fi
+}
+
+get_xml(){				# Download the xml file from xml_link.txt, if youtube/vimeo is found, pass that link to spider.txt
+	echo -n 'Downloading XML file... '
+	grep -E '(youtube|vimeo)' < /tmp/xml_file.txt > /dev/null
+	if [ $? == 0 ]
+	then
+		yt_vim_xml=`cat /tmp/xml_file.txt`
+		echo $yt_vim_xml >> /tmp/spider.txt
+		echo -e '\033[32mdone.\033[0m'
+	else				# Download the XML file from xml_link.txt and put it in xml_file.txt
+		wget -nv -i /tmp/xml_link.txt -o /tmp/tv03 -O /tmp/xml_file.txt
+		echo -e '\033[32mdone.\033[0m'
+	fi
+}
+
+get_xml_info(){				# Get the video title and put the video links in spider.txt
+	sed -n 's|.*\(<title><\!\[CDATA\[\)\([^>]*\).*|\2|p' /tmp/xml_file.txt | sed -n 's|\(]]\)||w /tmp/title.txt'
+	echo -n 'Getting video link... '
+	grep -i 'no_video.flv' < /tmp/xml_file.txt > /dev/null
+	if [ $? == 0 ]
+	then
+		echo -e '\033[31mERROR: No video link found!\033[0m'
+		clean_files	# Comment out this line when debugging
+		exit 0
+	else
+		grep -i 'filehd' < /tmp/xml_file.txt > /dev/null
+		if [ $? == 0 ]
+		then
+			sed -n 's|.*\(<filehd>\)\([^<]*\).*|\2|w /tmp/spider.txt' /tmp/xml_file.txt
+			echo -e '\033[32mdone.\033[0m'
+		else
+			
+			sed -n 's|.*\(<file>\)\([^<]*\).*|\2|p' /tmp/xml_file.txt >> /tmp/spider.txt
+			echo -e '\033[32mdone.\033[0m'
+		fi
+	fi
+}
+
+spider(){				# If trollvids is in spider.txt, use wgets --spider option to check if the video is reachable
+	grep -i 'trollvids' < /tmp/spider.txt > /dev/null
+	if [ $? == 0 ]
+	then
+		echo -n 'Checking video availability... '
+		wget -nv --spider -i /tmp/spider.txt -o /tmp/tv03
+		grep -i ' 200 OK' < /tmp/tv03 > /dev/null
+		if [ $? == 0 ]
+		then
+			sed -n 's|.*\(URL: \)||p' /tmp/tv03 | sed -n 's| 200 OK||p' >> /tmp/video.m3u
+			echo -e '\033[32mdone.\033[0m'
+		else
+			echo -e '\033[31mERROR: No valid URL or video unavailable right now.\033[0m'
+			clean_files	# Comment out this line when debugging
+			exit 0
+		fi
+	else				# If trollvids is not in spider.txt, pass the link to video.m3u
+		video=`cat /tmp/spider.txt`
+		echo "$video" >> /tmp/video.m3u
+		echo -e '\033[33mYoutube/Vimeo link detected.\033[0m'
+	fi
+}
+
+play(){					# Play video.m3u with mpv
+	video_link=`cat /tmp/video.m3u`
+	mpv $video_link
+}
+
+downloader(){				# Download the link in video.m3u with wget or youtube-dl
+	grep -i 'trollvids' < /tmp/video.m3u > /dev/null
+	if [ $? == 0 ]
+	then
+		title="`cat /tmp/title.txt`"
+		file_type="`sed -n 's|.*\(videos/\)\([0-9A-Za-z]*\)\([.*]*\)|\3|p' /tmp/video.m3u`"
+		echo -n 'Downloading file... '
+		wget -nv -nc -i /tmp/video.m3u -o /tmp/tv04 -O Trollvids\ -\ "$title""$file_type"
+		echo -e '\033[32mdone.\033[0m'
+	else
+		yt_download="`cat /tmp/video.m3u`"
+		grep -Ei '(youtube|vimeo|googledrive)' < /tmp/video.m3u > /dev/null
+		if [ $? == 0 ]
+		then
+			echo -e '\033[32mUsing youtube-dl to download video.\033[0m'
+			youtube-dl $yt_download
+		else
+			echo -e '\033[31mERROR: No downloadable link!\033[0m'
+			exit 0
+		fi
+	fi
+}
+
+info(){					# Get some info about a video from mainpage.txt NOT FULLY FUNCTIONAL!!
+	info_title="`sed -n 's|.*\(<meta property="og:title" content="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt`"
+	info_description="`sed -n 's|.*\(<meta property="og:description" content="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt`"
+	info_thumb="`sed -n 's|.*\(<meta property="og:image" content="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt`"
+	clear
+	echo -e '\033[33mGetting info...\033[33m'
+	echo
+	grep 'private_video_error' < /tmp/mainpage.txt > /dev/null
+	if [ $? == 0 ]
+	then
+		echo -e '\033[31mThis is a private video.\033[0m'
+		echo
+	else
+		echo -e '\033[32mThis video is not private.\033[0m'
+		echo
+	fi
+	echo -e '\033[33mVideo Title:\033[0m'
+	echo
+	echo $info_title
+	echo
+	echo -e '\033[33mDescription:\033[0m'
+	echo
+	echo $info_description
+	echo
+	echo -e '\033[33mVideo Thumbnail:\033[0m'
+	echo $info_thumb
+	echo
+	echo -e '\033[33mLinks(?):\033[0m'
+	echo NOT INCORPORATED YET
+	echo
+	echo
+}
+
+force_info(){				# Incomplete function
+	echo Getting video info...
+	sed -n 's|.*\(<meta property="og:description" content="\)\([^>]*\).*|\2|p' /tmp/mainpage.txt
+}
+
+show_help(){				# Relatively useless help
+	echo "Use one of the following:"
+	echo
+	echo "-c	Clean temporary files the script created. Useful after using the -t flag."
+	echo "-d	Download the video instead of streaming it."
+	echo "-D	Force download the video using the same process the -f flag uses."
+	echo "-f	Force get information of a video, (INCOMPLETE)"
+	echo "-h	Show this help screen."
+	echo "-i	Get information of a video, YMMV."
+	echo "-n	Stream normally."
+	echo "-t	Debugging and testing flag. Comment out lines with the function 'clean_files'."
+	echo "-v	Display script version."
+	echo "-z	Show possible errors and fixes."
+	echo
+}
+
+show_errors(){				# Useless error reporting
+	echo 'Work in progress ;^)'
+}
+
+# Check to see if $1 has trollvids.com in it, if it does, run normally.
+# If it's empty, output an usage message.
+# If it's a flag, do what the flag makes it do?
+#
+
+if [[ "$1" =~ "trollvids.com" ]]
+then
+	create_files
+	get_main
+	force_xml
+	get_xml
+	get_xml_info
+	spider
+	play
+	clean_files
+elif [[ -z $1 ]]
+then
+	echo Usage: tv-player URL or tv-player -h
+else
+	while getopts ":cd:Df:ghi:n:t:vz" opt; do
+		case $opt in
+		c)
+			clean_files
+			;;
+		d)
+			create_files
+			get_main
+			google_downloader
+			if [ $? = 1 ]
+			then
+				:
+			else
+				force_xml
+				get_xml
+				get_xml_info
+				spider
+				downloader
+				clean_files
+			fi
+			;;
+		D)
+			echo Deprecated!
+			;;
+		f)
+			create_files
+			get_main
+			force_info
+			clean_files
+			;;
+		g)
+			echo Deprecated!
+			;;
+		h)
+			show_help
+			;;
+		i)
+			create_files
+			get_main
+			get_xml
+			info
+			clean_files
+			;;
+		n)
+			create_files
+			get_main
+			force_xml
+			get_xml
+			get_xml_info
+			spider
+			play
+			clean_files
+			;;
+		t)
+			echo 'Dubugging and testing flag, disabled by default. Edit the script and comment all "clean_files" functions.'
+			#create_files
+			#get_main
+			#force_xml
+			#get_xml
+			#get_xml_info
+			#spider
+			#play
+			;;
+		v)
+			echo $version
+			;;
+		z)
+			show_errors
+			;;
+		\?)
+			echo "Invalid option: -$OPTARG" >&2
+			;;
+		:)
+			echo "Option -$OPTARG requires a URL."
+			;;
+		esac
+	done
+fi
