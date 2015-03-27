@@ -12,7 +12,9 @@
 
 url_f="$2" 			# if a flag is used, get the second argument as the URL
 url_nf="$1" 			# no flags, get the first argument as the URL
-version="tv-player_v0.3.1" 	# I've rewritten the code several times already, still don't like it
+version="tv-player_v0.3.2" 	# I've rewritten the code several times already, still don't like it
+cus_path=""			# Custom path NO SPACES!!
+ytdl_ops="-f bestvideo+bestaudio -o $cus_path%(title)s.-%(id)s.%(ext)s" # Custom youtube-dl options
 
 create_files(){			# Create all the files needed
 	touch \
@@ -186,7 +188,7 @@ downloader(){				# Download the link in video.m3u with wget or youtube-dl
 		title="`cat /tmp/title.txt`"
 		file_type="`sed -n 's|.*\(videos/\)\([0-9A-Za-z]*\)\([.*]*\)|\3|p' /tmp/video.m3u`"
 		echo -n 'Downloading file... '
-		wget -nv -nc -i /tmp/video.m3u -o /tmp/tv04 -O Trollvids\ -\ "$title""$file_type"
+		wget -nv -nc -i /tmp/video.m3u -o /tmp/tv04 -O "$cus_path"Trollvids\ -\ "$title""$file_type"
 		echo -e '\033[32mdone.\033[0m'
 	else
 		yt_download="`cat /tmp/video.m3u`"
@@ -194,7 +196,7 @@ downloader(){				# Download the link in video.m3u with wget or youtube-dl
 		if [ $? == 0 ]
 		then
 			echo -e '\033[32mUsing youtube-dl to download video.\033[0m'
-			youtube-dl $yt_download
+			youtube-dl $ytdl_ops $yt_download
 		else
 			echo -e '\033[31mERROR: No downloadable link!\033[0m'
 			exit 0
