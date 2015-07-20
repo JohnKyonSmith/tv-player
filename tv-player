@@ -12,9 +12,16 @@
 
 url_f="$2" 			# if a flag is used, get the second argument as the URL
 url_nf="$1" 			# no flags, get the first argument as the URL
-version="tv-player_v0.3.2" 	# I've rewritten the code several times already, still don't like it
-cus_path=""			# Custom path NO SPACES!!
-ytdl_ops="-f bestvideo+bestaudio -o $cus_path%(title)s.-%(id)s.%(ext)s" # Custom youtube-dl options
+version="tv-player_v0.3.3" 	# I've rewritten the code several times already, still don't like it
+cus_path=""			# Custom path NO SPACES!! (ex. /home/kyouma/MMD/)
+ytdl_ops="" 			# Custom youtube-dl options
+# ex. 
+# ytdl_ops="-f bestvideo+bestaudio -o $cus_path%(title)s.-%(id)s.%(ext)s"
+#
+c_00="\033[0m"			# Default color
+c_01="\033[31m"			# Red
+c_02="\033[32m"			# Green
+c_03="\033[33m"			# Yellow
 
 create_files(){			# Create all the files needed
 	touch \
@@ -26,10 +33,11 @@ create_files(){			# Create all the files needed
 		/tmp/xml_file.txt \
 		/tmp/xml_link.txt \
 		/tmp/video.m3u \
+		/tmp/video_links.txt \
 		/tmp/tv01 \
 		/tmp/tv02 \
 		/tmp/tv03 \
-		/tmp/tv04
+		/tmp/tv04 
 }
 
 clean_files(){			# Clean the files when exiting script normally
@@ -46,11 +54,12 @@ clean_files(){			# Clean the files when exiting script normally
 			/tmp/xml_file.txt \
 			/tmp/xml_link.txt \
 			/tmp/video.m3u \
+			/tmp/video_links.txt \
 			/tmp/tv01 \
 			/tmp/tv02 \
 			/tmp/tv03 \
-			/tmp/tv04
-		echo -e '\033[32mdone.\033[0m'
+			/tmp/tv04 
+		echo -e "${c_02}done.${c_00}"
 	else
 		echo No files to clean.
 		exit 0
@@ -66,7 +75,7 @@ get_main(){			# Download the video page
 	then
 		wget -nv "$url_f" -o /tmp/tv01 -O /tmp/mainpage.txt
 	fi
-	echo -e '\033[32mdone.\033[0m'
+	echo -e "${c_02}done.${c_00}"
 }
 
 force_xml(){			# Force an XML file link based on the URL and check to see if the source is from google/vimeo or has a valid XML file
@@ -82,9 +91,9 @@ force_xml(){			# Force an XML file link based on the URL and check to see if the
 	then
 		google_video=`sed -n 's|.*\(<iframe src="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt | sed -n 's|preview|view|p'`
 		echo "$google_video" > /tmp/google.txt
-		echo -e '\033[33mBOTNET video detected!\033[0m'
-		echo -e '\033[32mLinking to direct video:\033[0m'
-		echo -e "\033[32m$google_video\033[0m"
+		echo -e "${c_03}BOTNET video detected!${c_00}"
+		echo -e "${c_02}Linking to direct video:${c_00}"
+		echo -e "${c_02}$google_video${c_00}"
 		clean_files	# Comment out this line when debugging
 		exit 0
 	else										# If vimeo is found, output a link to xml_link.txt
@@ -108,9 +117,9 @@ google_downloader(){			# Almost identical to what force_xml does, but instead of
 		echo "$google_video_down" > /tmp/google.txt
 		google_link=`sed -n 's|.*\(file/d/\)\([^/]*\)/.*|\2|p' <<< $google_video_down`
 		google_download="https://docs.google.com/uc?id=$google_link&export=download"
-		echo -e '\033[33mBOTNET video detected!\033[0m'
-		echo -e '\033[32mLinking to download:\033[0m'
-		echo -e "\033[32m$google_download\033[0m"
+		echo -e "${c_03}BOTNET video detected!${c_00}"
+		echo -e "${c_02}Linking to download:${c_00}"
+		echo -e "${c_02}$google_download${c_00}"
 		clean_files #Comment out this line when debugging
 		exit 0
 	fi
@@ -123,10 +132,10 @@ get_xml(){				# Download the xml file from xml_link.txt, if youtube/vimeo is fou
 	then
 		yt_vim_xml=`cat /tmp/xml_file.txt`
 		echo $yt_vim_xml >> /tmp/spider.txt
-		echo -e '\033[32mdone.\033[0m'
+		echo -e "${c_02}done.${c_00}"
 	else				# Download the XML file from xml_link.txt and put it in xml_file.txt
 		wget -nv -i /tmp/xml_link.txt -o /tmp/tv03 -O /tmp/xml_file.txt
-		echo -e '\033[32mdone.\033[0m'
+		echo -e "${c_02}done.${c_00}"
 	fi
 }
 
@@ -136,7 +145,7 @@ get_xml_info(){				# Get the video title and put the video links in spider.txt
 	grep -i 'no_video.flv' < /tmp/xml_file.txt > /dev/null
 	if [ $? == 0 ]
 	then
-		echo -e '\033[31mERROR: No video link found!\033[0m'
+		echo -e "${c_01}ERROR: No video link found!${c_00}"
 		clean_files	# Comment out this line when debugging
 		exit 0
 	else
@@ -144,11 +153,11 @@ get_xml_info(){				# Get the video title and put the video links in spider.txt
 		if [ $? == 0 ]
 		then
 			sed -n 's|.*\(<filehd>\)\([^<]*\).*|\2|w /tmp/spider.txt' /tmp/xml_file.txt
-			echo -e '\033[32mdone.\033[0m'
+			echo -e "${c_02}done.${c_00}"
 		else
 			
 			sed -n 's|.*\(<file>\)\([^<]*\).*|\2|p' /tmp/xml_file.txt >> /tmp/spider.txt
-			echo -e '\033[32mdone.\033[0m'
+			echo -e "${c_02}done.${c_00}"
 		fi
 	fi
 }
@@ -163,21 +172,21 @@ spider(){				# If trollvids is in spider.txt, use wgets --spider option to check
 		if [ $? == 0 ]
 		then
 			sed -n 's|.*\(URL: \)||p' /tmp/tv03 | sed -n 's| 200 OK||p' >> /tmp/video.m3u
-			echo -e '\033[32mdone.\033[0m'
+			echo -e "${c_02}done.${c_00}"
 		else
-			echo -e '\033[31mERROR: No valid URL or video unavailable right now.\033[0m'
-			clean_files	# Comment out this line when debugging
+			echo -e "${c_01}ERROR: No valid URL or video unavailable right now.${c_00}"
+#			clean_files	# Comment out this line when debugging
 			exit 0
 		fi
 	else				# If trollvids is not in spider.txt, pass the link to video.m3u
 		video=`cat /tmp/spider.txt`
 		echo "$video" >> /tmp/video.m3u
-		echo -e '\033[33mYoutube/Vimeo link detected.\033[0m'
+		echo -e "${c_03}Youtube/Vimeo link detected.${c_00}"
 	fi
 }
 
 play(){					# Play video.m3u with mpv
-	video_link=`cat /tmp/video.m3u`
+	video_link=`cat /tmp/video.m3u | uniq`
 	mpv $video_link
 }
 
@@ -187,18 +196,17 @@ downloader(){				# Download the link in video.m3u with wget or youtube-dl
 	then
 		title="`cat /tmp/title.txt`"
 		file_type="`sed -n 's|.*\(videos/\)\([0-9A-Za-z]*\)\([.*]*\)|\3|p' /tmp/video.m3u`"
-		echo -n 'Downloading file... '
-		wget -nv -nc -i /tmp/video.m3u -o /tmp/tv04 -O "$cus_path"Trollvids\ -\ "$title""$file_type"
-		echo -e '\033[32mdone.\033[0m'
+		echo 'Downloading file: '
+		wget -q --show-progress -nc -i /tmp/video.m3u -O "$cus_path"Trollvids\ -\ "$title""$file_type"
 	else
 		yt_download="`cat /tmp/video.m3u`"
 		grep -Ei '(youtube|vimeo|googledrive)' < /tmp/video.m3u > /dev/null
 		if [ $? == 0 ]
 		then
-			echo -e '\033[32mUsing youtube-dl to download video.\033[0m'
+			echo -e "${c_02}Using youtube-dl to download video.${c_00}"
 			youtube-dl $ytdl_ops $yt_download
 		else
-			echo -e '\033[31mERROR: No downloadable link!\033[0m'
+			echo -e "${c_01}ERROR: No downloadable link!${c_00}"
 			exit 0
 		fi
 	fi
@@ -209,29 +217,29 @@ info(){					# Get some info about a video from mainpage.txt NOT FULLY FUNCTIONAL
 	info_description="`sed -n 's|.*\(<meta property="og:description" content="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt`"
 	info_thumb="`sed -n 's|.*\(<meta property="og:image" content="\)\([^"]*\).*|\2|p' /tmp/mainpage.txt`"
 	clear
-	echo -e '\033[33mGetting info...\033[33m'
+	echo -e "${c_03}Getting info...${c_00}"
 	echo
 	grep 'private_video_error' < /tmp/mainpage.txt > /dev/null
 	if [ $? == 0 ]
 	then
-		echo -e '\033[31mThis is a private video.\033[0m'
+		echo -e "${c_01}This is a private video.${c_00}"
 		echo
 	else
-		echo -e '\033[32mThis video is not private.\033[0m'
+		echo -e "${c_02}This video is not private.${c_00}"
 		echo
 	fi
-	echo -e '\033[33mVideo Title:\033[0m'
+	echo -e "${c_03}Video Title:${c_00}"
 	echo
 	echo $info_title
 	echo
-	echo -e '\033[33mDescription:\033[0m'
+	echo -e "${c_03}Description:${c_00}"
 	echo
 	echo $info_description
 	echo
-	echo -e '\033[33mVideo Thumbnail:\033[0m'
+	echo -e "${c_03}Video Thumbnail:${c_00}"
 	echo $info_thumb
 	echo
-	echo -e '\033[33mLinks(?):\033[0m'
+	echo -e "${c_03}Links(?):${c_00}"
 	echo NOT INCORPORATED YET
 	echo
 	echo
@@ -354,7 +362,7 @@ else
 			echo "Invalid option: -$OPTARG" >&2
 			;;
 		:)
-			echo "Option -$OPTARG requires a URL."
+			echo "Option -$OPTARG requires a URL/file."
 			;;
 		esac
 	done
