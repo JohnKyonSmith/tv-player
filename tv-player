@@ -187,7 +187,7 @@ spider(){				# If trollvids is in spider.txt, use wgets --spider option to check
 
 play(){					# Play video.m3u with mpv
 	video_link=`cat /tmp/video.m3u | uniq`
-	mpv $video_link
+	mpv --media-title="`cat /tmp/title.txt`" $video_link
 }
 
 downloader(){				# Download the link in video.m3u with wget or youtube-dl
