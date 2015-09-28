@@ -1,9 +1,19 @@
 #!/bin/bash
 
-# General variables
+##
+##
+## Script to view/download/get info from videos on trollvids without needing flash
+## Requires:
+##	-mpv with networking support (ffmpeg with networking)
+##	-youtube-dl
+##	-everything else should come with a default GNU/Linux install
+##
+##
 
-url_f="$2"			#use $2 if there is a flag being used
-url_nf="$1"			#use $1 if there is no flags
+# General 
+
+url_f="$2"			# use $2 if there is a flag being used
+url_nf="$1"			# use $1 if there is no flags
 script_files="/tmp/tv-player"	# Location where the script will put it's files
 version="tv-player_v0.4"	# Script version (pretty inconsistant)
 cus_path=""			# Custom path to put downloads (ex. /home/kyouma/MMD/)
