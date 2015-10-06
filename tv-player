@@ -36,22 +36,28 @@ create_files(){
 		$script_files/tv_log01
 }
 
-clean_files(){
+clean_files_nask(){
+	if [ -d $script_files ]
+	then
+		echo -n "Cleaning files... "
+		rm -R $script_files
+		echo -e "${c_02}done.${c_00}"
+		exit 0
+	else
+		echo -e "${c_03}No files to clean.${c_00}"
+		exit 0
+
+	fi
+}
+
+clean_files_ask(){
 	read -p "Delete script files?(y/n) " delete
 	if [ $delete == y ]
 	then
-		if [ -d $script_files ]
-		then
-			echo -n "Cleaning files... "
-			rm -R $script_files
-			echo -e "${c_02}done.${c_00}"
-		else
-			echo -e "${c_03}No files to clean.${c_00}"
-			exit 0
-
-		fi
+		clean_files_nask
 	else
 		echo -e "${c_01}Not cleaning files!${c_00}"
+		exit 0
 	fi
 }
 
@@ -101,7 +107,7 @@ xml_info(){
 	if [ $? == 0 ]
 	then
 		echo -e "${c_01}No video link found!${c_00}"
-		clean_files
+		clean_files_nask
 	else
 		grep -i 'filehd' $script_files/xml_file.txt > /dev/null
 		if [ $? == 0 ]
@@ -147,6 +153,7 @@ play(){
 		echo -e "${c_03}Botnet video detected!!${c_00}"
 		echo -e "${c_02}Linking to direct video:${c_00}"
 		echo -e "${c_02}$botnet_video${c_00}"
+		clean_files_ask
 	else
 		mpv --media-title="$video_title" $video_play
 	fi
@@ -164,6 +171,7 @@ downloader(){
 		echo -e "${c_03}Botnet video detected!${c_00}"
 		echo -e "${c_02}Linking to download:${c_00}"
 		echo -e "${c_02}$botnet_link${c_00}"
+		clean_files_ask
 	else
 		grep -E '(youtube|vimeo)' $script_files/multi.txt
 		if [ $? == 0 ]
@@ -180,6 +188,8 @@ downloader(){
 		fi
 	fi
 }
+
+# Video Info
 
 info(){
 	info_title="`sed -n 's|.*\(<meta property="og:title" content="\)\([^"]*\).*|\2|p' $script_files/mainpage.txt`"
@@ -238,7 +248,7 @@ then
 	xml_info
 	spider
 	play
-	clean_files
+	clean_files_nask
 elif [[ -z $1 ]]
 then
 	echo Usage: tv-player URL or tv-player -h
@@ -246,7 +256,7 @@ else
 	while getopts ":cd:hi:n:t:vz" opt; do
 		case $opt in
 			c)
-				clean_files
+				clean_files_nask
 				;;
 			d)
 				create_files
@@ -256,7 +266,7 @@ else
 				xml_info
 				spider
 				downloader
-				clean_files
+				clean_files_nask
 				;;
 			h)
 				show_help
@@ -265,7 +275,7 @@ else
 				create_files
 				get_main
 				info
-				clean_files
+				clean_files_nask
 				;;
 			n)
 				create_files
@@ -275,7 +285,7 @@ else
 				xml_info
 				spider
 				play
-				clean_files
+				clean_files_nask
 				;;
 			v)
 				echo $version
