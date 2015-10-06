@@ -15,7 +15,7 @@
 url_f="$2"			# use $2 if there is a flag being used
 url_nf="$1"			# use $1 if there is no flags
 script_files="/tmp/tv-player"	# Location where the script will put it's files
-version="tv-player_v0.4"	# Script version (pretty inconsistant)
+version="tv-player_v0.41"	# Script version (pretty inconsistant)
 cus_path=""			# Custom path to put downloads (ex. /home/kyouma/MMD/)
 tube_ops=""			# Only applies to videos downloaded with youtube-dl
 # ex. tube_ops="-f bestvideo+bestaudio -o $cus_path%(title)s.-%(ext)s"
