@@ -15,7 +15,7 @@
 url_f="$2"			# use $2 if there is a flag being used
 url_nf="$1"			# use $1 if there is no flags
 script_files="/tmp/tv-player"	# Location where the script will put it's files
-version="tv-player_v0.41"	# Script version (pretty inconsistant)
+version="tv-player_v0.42"	# Script version (pretty inconsistant)
 cus_path=""			# Custom path to put downloads (ex. /home/kyouma/MMD/)
 tube_ops=""			# Only applies to videos downloaded with youtube-dl
 # ex. tube_ops="-f bestvideo+bestaudio -o $cus_path%(title)s.-%(ext)s"
@@ -87,14 +87,21 @@ xml_file(){
 		google_video=`sed -n 's|.*\(iframe src="\)\([^"]*\).*|\2|p' $script_files/mainpage.txt | sed -n 's|preview|view|p'`
 		echo "VIDEO_LINK:$google_video" >> $script_files/multi.txt
 	else
-		grep -i 'player.vimeo.com' $script_files/mainpage.txt > /dev/null
+		grep -i "mediafire.com/watch" $script_files/mainpage.txt > /dev/null
 		if [ $? == 0 ]
 		then
-			vimeo_video=`sed -n 's|.*\(player.vimeo.com\)\([^"]*\).*|\2|p' $script_files/mainpage.txt | sed -n 's|/video/|http://vimeo.com/|p'`
-			echo "VIDEO_LINK:$vimeo_video" >> $script_files/multi.txt
+			mediafire_video=`sed -n 's|.*\(id="embeddedVideoFrame" src="\)\([^"]*\).*|\2|p' $script_files/mainpage.txt`
+			echo "VIDEO_LINK:$mediafire_video" >> $script_files/multi.txt
 		else
-			xml_FILE=`grep "XML_URL:" $script_files/multi.txt | sed -n "s|.*\(XML_URL:\)\(.*\)|\2|p"`
-			wget -nv $xml_FILE -o $script_files/tv_log00 -O $script_files/xml_file.txt
+			grep -i 'player.vimeo.com' $script_files/mainpage.txt > /dev/null
+			if [ $? == 0 ]
+			then
+				vimeo_video=`sed -n 's|.*\(player.vimeo.com\)\([^"]*\).*|\2|p' $script_files/mainpage.txt | sed -n 's|/video/|http://vimeo.com/|p'`
+				echo "VIDEO_LINK:$vimeo_video" >> $script_files/multi.txt
+			else
+				xml_FILE=`grep "XML_URL:" $script_files/multi.txt | sed -n "s|.*\(XML_URL:\)\(.*\)|\2|p"`
+				wget -nv $xml_FILE -o $script_files/tv_log00 -O $script_files/xml_file.txt
+			fi
 		fi
 	fi
 }
@@ -155,7 +162,17 @@ play(){
 		echo -e "${c_02}$botnet_video${c_00}"
 		clean_files_ask
 	else
-		mpv --media-title="$video_title" $video_play
+		grep "mediafire.com" $script_files/multi.txt > /dev/null
+		if [ $? == 0 ]
+		then
+			mediafire_link=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_LINK:\)\(.*\)|\2|p"`
+			echo -e "${c_03}Mediafire video detected!${c_00}"
+			echo -e "${c_02}Linking to direct video:${c_00}"
+			echo -e "${c_02}$mediafire_link${c_00}"
+			clean_files_ask
+		else
+			mpv --media-title="$video_title" $video_play
+		fi
 	fi
 }
 
@@ -173,18 +190,29 @@ downloader(){
 		echo -e "${c_02}$botnet_link${c_00}"
 		clean_files_ask
 	else
-		grep -E '(youtube|vimeo)' $script_files/multi.txt
+		grep "mediafire.com" $script_files/multi.txt > /dev/null
 		if [ $? == 0 ]
 		then
-			tube_download=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_LINK:\)\(.*\)|\2|p"`
-			echo -e "${c_03}Youtube/Vimeo detected!${c_00}"
-			echo -e "${c_02}Using youtube-dl to download video.${c_00}"
-			youtube-dl $tube_ops $tube_download
+			mediafire_video=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_LINK:\)\(.*\)|\2|p" | sed -n 's|.*\(embed/?\)\([^&]*\).*|\2|p'`
+			mediafire_link="http://www.mediafire.com/download/$mediafire_video/"
+			echo -e "${c_03}Mediafire video detected!${c_00}"
+			echo -e "${c_02}Linking to download:${c_00}"
+			echo -e "${c_02}$mediafire_link${c_00}"
+			clean_files_ask
 		else
-			video_title=`grep "VIDEO_TITLE:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_TITLE:\)\(.*\)|\2|p"`
-			video_link=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_LINK:\)\(.*\)|\2|p"`
-			file_type=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(/videos/\)\([0-9A-Za-z]*\)\([.*]*\)|\3|p"`
-			wget -q --show-progress -nc $video_link -O "$cus_path"Trollvids\ -\ "$video_title""$file_type"
+			grep -E '(youtube|vimeo)' $script_files/multi.txt
+			if [ $? == 0 ]
+			then
+				tube_download=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_LINK:\)\(.*\)|\2|p"`
+				echo -e "${c_03}Youtube/Vimeo detected!${c_00}"
+				echo -e "${c_02}Using youtube-dl to download video.${c_00}"
+				youtube-dl $tube_ops $tube_download
+			else
+				video_title=`grep "VIDEO_TITLE:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_TITLE:\)\(.*\)|\2|p"`
+				video_link=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(VIDEO_LINK:\)\(.*\)|\2|p"`
+				file_type=`grep "VIDEO_LINK:" $script_files/multi.txt | sed -n "s|.*\(/videos/\)\([0-9A-Za-z]*\)\([.*]*\)|\3|p"`
+				wget -q --show-progress -nc $video_link -O "$cus_path"Trollvids\ -\ "$video_title""$file_type"
+			fi
 		fi
 	fi
 }
