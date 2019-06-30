@@ -1,3 +1,7 @@
+# ATTENTION: Discontinued! Use [iwachan](https://github.com/JohnKyonSmith/iwachan).
+
+__Due to site updates, this script no longer works.__
+
 # tv-player
 Script to play videos from trollvids without flash
 
